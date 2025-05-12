@@ -1,0 +1,129 @@
+name: Repository Inspect
+plugin: serial
+tasks:
+  - name: Detect Project Languages
+    plugin: prompt
+    model: [inspect, architect]
+    parser: list
+    register: project_languages
+    content: |
+      Analyze the provided file paths to identify programming languages used in the project. Determine languages based on:
+      - File extensions (e.g., `.py` for Python, `.js` for JavaScript).
+      - Shebangs (e.g., `#!/usr/bin/env python`).
+      - Common file names or patterns (e.g., `package.json` for JavaScript, `requirements.txt` for Python).
+      Return a concise list of detected programming languages followed by the extensions (e.g., ["Python .py", "JavaScript .js"]). Exclude languages not explicitly indicated by file extensions or content. Do not speculate or infer languages from ambiguous files (e.g., `.md`, `.txt`).
+      {{ prompt2.paths(extension_paths) }}
+
+  - name: Analyze Project Aspects
+    plugin: parallel
+    description: Gather factual descriptions of project aspects for README.
+    tasks:
+      - name: Code Style Description
+        plugin: serial
+        tasks:
+          - name: Identify Code Style Files
+            plugin: prompt
+            model: [inspect, architect]
+            parser: list
+            register: code_style_files
+            content: |
+              From the provided files, list only those that define code style and conventions for the detected languages ({{ project_languages }}). Include files such as:
+              - Linter configs (e.g., `.eslintrc`, `.pylintrc`).
+              - Formatter configs (e.g., `.prettierrc`, `pyproject.toml` with formatting sections).
+              - Editor configs (e.g., `.editorconfig`).
+              - Style guides (e.g., `CODE_STYLE.md`).
+              Also include ONE file per language which seems major enough to be
+              used as an examle for you to infer coding style.
+              Return full file paths exactly as provided. Exclude files unrelated to code style (e.g., `README.md`, `package.json` unless it contains linting rules). For each file, confirm it contains relevant content (e.g., search for keywords like "indent", "max_line_length", "camelCase").
+              {{ prompt2.paths(project_files) }}
+
+          - name: Output Code Style
+            plugin: prompt
+            model: [inspect, architect]
+            register: code_style_description
+            parser: wholefile
+            content: |
+              Generate a concise list of code style rules for each detected programming language ({{ project_languages }}). Include only:
+              - Formatting (e.g., indentation, line length).
+              - Naming conventions (e.g., camelCase, snake_case).
+              - Language-specific practices.
+              - Tools used (e.g., linters, formatters).
+              - Comment/documentation standards.
+              - File structure.
+              Use direct statements (e.g., "Python indentation: 4 spaces"). Create one list per detected language. Only include languages from {{ project_languages }}. Do not reference specific files or use speculative language.
+              {{ prompt2.contents(code_style_files) }}
+
+      - name: Testing Description
+        plugin: serial
+        tasks:
+          - name: Identify Test Files
+            plugin: prompt
+            model: [inspect, architect]
+            parser: larbin.pathlist
+            register: test_files
+            content: |
+              We want to generate a concise list of commands to run tests for the detected languages ({{ project_languages }}) in this code repository.
+              List only the files needed to infer the test commands, such as configuration or metadata files. Include:
+              - Test framework configuration files (e.g., files defining test settings, runners, or environments).
+              - CI configuration files with testing steps (e.g., files in `.github/workflows/`, `.gitlab-ci.yml`, or similar).
+              - Package or project metadata files that may include test scripts, dependencies, or build configurations relevant to testing (e.g., files like `package.json`, `build.gradle`, or `pom.xml`).
+              - Documentation files (e.g., `README.md`, `TESTING.md`) only if they are highly suceptible to describe test setup or commands.
+
+              Exclude:
+              - Actual test scripts or files containing test cases (e.g., files with names starting with `test_`, ending with `_test`, or containing test functions/cases).
+              - Files in directories typically used for tests (e.g., `test/`, `tests/`, `spec/`, `__tests__/`, or similar).
+              - Files that are primarily test implementations, even if they include some configuration (e.g., files defining test fixtures or helpers unless they are framework-wide configs).
+
+              For each file, confirm it contains testing-related configuration or metadata by searching for keywords related to test frameworks, runners, or CI (e.g., "test", "ci", "build", "run", "script", but only in the context of configuration or setup). Avoid relying on generic keywords like "assert" or "test" that appear in test scripts. Prefer files in the project root, build directories, or CI directories over files in test-specific directories. Return full file paths exactly as provided, and include a brief justification for each file's inclusion based on its role in inferring test commands.
+              {{ prompt2.paths(project_files) }}
+          - name: Output Testing Steps
+            plugin: prompt
+            model: [inspect, architect]
+            register: test_description
+            content: |
+              Based on the provided test files, generate a concise list of commands to run tests in verbose mode for the detected languages ({{ project_languages }}). Include only:
+              - Commands to run the test framework, with all options to make it as verbose as possible, including to make the stacktrace as verbose as possible, ie. full and with local variables, however, don't care about coverage
+              - Group commands by language.
+              Only include languages from {{ project_languages }}. Output commands only, formatted clearly, with no explanation. If no test files are provided for a language then skip it.
+              {{ prompt2.contents(test_files[:7]) }}
+
+      - name: Documentation Description
+        plugin: serial
+        tasks:
+        - name: Identify Documentation Files
+          plugin: prompt
+          model: [inspect, architect]
+          parser: list
+          register: documentation_files
+          content: |
+            As an AI, analyze this coding project to determine how documentation is structured, which documentation tools or frameworks are used, the configuration for these tools, and any associated plugins or extensions. List the specific files you need to read to gather this information.
+            Do not list all documentation files, only whatever we need to infer documentation configuration style and build, except for ONE actual documentation file that seems relevant to infer documentation style.
+            {{ prompt2.paths(project_files) }}
+
+        - name: Output Documentation instructions
+          plugin: prompt
+          model: [inspect, architect]
+          register: documentation_description
+          content: |
+            Given the contents of the provided project files, identify the documentation tools, configuration, and plugins in this coding project. Generate a concise and minimalistic list of base commands in verbose mode to build or generate the documentation in a favorite format, no need for commands to generate both in pdf and epub, html format should always be preferred, avoiding duplication and ensuring commands are not listed per file unless necessary, formatted clearly, with no additional explanation.
+            {{ prompt2.contents(documentation_files) }}
+
+  - name: Create a markdown document
+    plugin: prompt
+    model: [inspect, architect]
+    register: inspect_output
+    description: Build a final document with all this information
+    parser: wholefile
+    content: |
+      This is the content about code style, testing, and documentation project.
+
+      Code style description:
+      {{ code_style_description }}
+
+      Testing description:
+      {{ test_description }}
+
+      Documentation description:
+      {{ documentation_description }}
+
+      Your reply must be a structured markdown file with the above information.

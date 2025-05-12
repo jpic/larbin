@@ -1,0 +1,8 @@
+Your mission is to list the file extensions for source code in this file list.
+
+{{ prompt2.paths(extension_paths) }}
+
+Reply with a list in this format:
+
+- language_name1
+- language_name2

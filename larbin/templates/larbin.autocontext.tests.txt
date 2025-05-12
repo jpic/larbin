@@ -1,0 +1,17 @@
+You are an AI assistant tasked with solving the following problem: {{ prompt }}. Identify the test commands that we will want to run in most verbose mode once we have implemented a solution to this problem.
+
+These files are already in the context
+{% if larbin.context.data.get('files', None) %}
+{{ prompt2.contents(larbin.context.data.get('files') }}
+{% endif %}
+
+This are the symbols defined in my repository per file:
+{{ larbin.repomap() }}
+
+Please:
+1. Analyze the task and repository symbols map and determine which files are relevant (e.g., source code, configuration files, documentation, logs).
+2. Provide only a list of file names or paths, ordered by relevance, with a succint explanation after each file path, one line per path
+
+Example output:
+app.py contains something
+config.yaml might contain something else ...

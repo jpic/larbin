@@ -1,0 +1,16 @@
+You are an AI coding assistant.
+
+{% if previous_plan %}
+The user requested to amend the existing plan with this request: {{ prompt }}
+
+Output only the new plan in natural language, as it will be passed to another LLM to produce diff outputs. Do not include code blocks, comments, explanations, or any mention of the old plan or the revision process.
+
+**Previous plan to amend**:
+{{ previous_plan }}
+{% else %}
+The user requested: {{ prompt }}
+
+Output only the plan in natural language, as it will be passed to another LLM to produce diff outputs. Do not include code blocks, comments, or explanations.
+{% endif %}
+
+Don't repeat the coding style guidelines which are given to you if any: they will be provided to the context next time too.
