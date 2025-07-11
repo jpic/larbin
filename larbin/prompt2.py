@@ -7,7 +7,21 @@ from prompt2 import parser
 from pathlib import Path
 
 
-class SearchReplaceParser(parser.Parser):
+class CodeParser(parser.Parser):
+    def apply_diff(self):
+        if getattr(self, 'apply_always', False):
+            return True
+        result = cli2.choice(
+            'Apply diff? (A for Always/Auto)',
+            ['y', 'n', 'a'],
+        )
+        if result == 'a':
+            self.apply_always = True
+            return True
+        return result == 'y'
+
+
+class SearchReplaceParser(CodeParser):
     system = textwrap.dedent('''
         You are an automated coding assistant tasked with modifying files based on user instructions. Your response must consist only of search/replace edit blocks in the exact format below, with no additional text, explanations, or whole-file content outside this format. Each edit block must target a single file and include a relative path (relative to the project root) specified in a line starting with EDIT BLOCK FOR <relative/path/to/file>, followed by a code block wrapped in triple backticks (```) containing the code to be replaced and the new code to insert. Within the code block, use single-line markers `<<<<SEARCH` to indicate the start of the code to be replaced and `<<<<REPLACE` to indicate the start of the new code to insert. The `EDIT BLOCK FOR` line *must* be outside the triple backticks and must not appear in the code block. The file extension must match the programming language (e.g., .py for Python, .js for JavaScript). If the user does not provide a path or filename, infer a relative path (e.g., src/<filename>) and filename based on the task, and add a comment in the code after `<<<<REPLACE` noting the inferred path. If the language is unclear, default to Python. Every edit block *must* have a preceding `EDIT BLOCK FOR` line with a relative path. Outputting whole files, diff blocks, or any other format will crash the system. Ensure the code after `<<<<SEARCH` matches the existing file content exactly, and the code after `<<<<REPLACE` is syntactically correct. If no file changes are needed, output nothing.
 
@@ -101,6 +115,10 @@ class SearchReplaceParser(parser.Parser):
 
             # Generate unified diff
             new_text = old_text.replace(edit['search'], edit['replace'], 1)
+
+            if new_text == old_text:
+                continue
+
             diff = difflib.unified_diff(
                 old_text.splitlines(),
                 new_text.splitlines(),
@@ -120,20 +138,8 @@ class SearchReplaceParser(parser.Parser):
             with open(path_str, 'w') as f:
                 f.write(new_text)
 
-    def apply_diff(self):
-        if getattr(self, 'apply_always', False):
-            return True
-        result = cli2.choice(
-            'Apply diff? (A for Always/Auto)',
-            ['y', 'n', 'a'],
-        )
-        if result == 'a':
-            self.apply_always = True
-            return True
-        return result == 'y'
 
-
-class WholefilesParser(parser.Parser):
+class WholefilesParser(CodeParser):
     system = textwrap.dedent("""
         You are an automated coding assistant tasked with creating or modifying files based on user instructions. Your response must consist only of file operations in the exact format below, with no additional text, explanations, code, or diff blocks outside this format:
 
@@ -196,24 +202,15 @@ class WholefilesParser(parser.Parser):
                 lineterm='',
             )
 
+            if not diff:
+                continue
+
             cli2.diff(diff)
             if not self.apply_diff():
                 return
 
             with open(path_str, 'w') as f:
                 f.write(new_text)
-
-    def apply_diff(self):
-        if getattr(self, 'apply_always', False):
-            return True
-        result = cli2.choice(
-            'Apply diff? (A for Always/Auto)',
-            ['y', 'n', 'a'],
-        )
-        if result == 'a':
-            self.apply_always = True
-            return True
-        return result == 'y'
 
 
 class DiffMarkdownParser(parser.Parser):

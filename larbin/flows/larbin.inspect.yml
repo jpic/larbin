@@ -46,6 +46,7 @@ tasks:
               Generate a concise list of code style rules for each detected programming language ({{ project_languages }}). Include only:
               - Formatting (e.g., indentation, line length).
               - Naming conventions (e.g., camelCase, snake_case).
+              - Multi-line statements formatting (e.g., operators at end or beginning of line)
               - Language-specific practices.
               - Tools used (e.g., linters, formatters).
               - Comment/documentation standards.

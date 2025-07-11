@@ -39,7 +39,7 @@ class PlanPlugin(larbin.Plugin):
             previous_plan=previous_plan,
             prompt=prompt,
         )
-        prompt.content += await self.context.template()
+        prompt.content += '\n' + await self.context.template()
 
         model = prompt2.Model(['plan', 'architect'])
         if self.context.plan.exists():
